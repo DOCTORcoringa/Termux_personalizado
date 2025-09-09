@@ -5,7 +5,8 @@
 Doctor Personalização - Painel de customização do Termux
 Criado por Doctor Coringa Lunático 🌙 - 2025
 
-Painel com banner ASCII colorido, prompt customizado e persistência no shell.
+Painel com banner ASCII colorido, prompt customizado e persistência no shell,
+com opção de banner do sistema estilo Lunático 3D + front Doctor.
 """
 
 import os
@@ -18,6 +19,7 @@ from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.align import Align
 from rich.text import Text
+from rich.box import ASCII_DOUBLE_HEAD
 
 console = Console()
 CONFIG_PATH = os.path.expanduser("~/.doctor_personalizacao_config.json")
@@ -65,7 +67,8 @@ def load_config():
         "style": 0,
         "color": "green",
         "password_enabled": False,
-        "password": ""
+        "password": "",
+        "system_banner_enabled": False  # nova flag para a opção 10
     }
 
 def save_config(cfg):
@@ -111,35 +114,55 @@ def generate_bashrc(cfg):
     prompt_style = cfg.get("style", 0)
     prompt_color = cfg.get("color", "green")
 
-    banner_command = f"""
-figlet -f {banner_style} "{banner_name}" | GREP_COLOR='01;{termcolor_code(banner_color)}' grep --color=always '.'
+    # Se 'system_banner_enabled' estiver ativo, gerar bashrc para o banner Lunático + Front Doctor
+    if cfg.get("system_banner_enabled"):
+        banner_command = """
+clear
+echo
+echo -e "\\e[35m"
+figlet -f 3-d "Lunático"
+echo -e "\\e[0m"
+echo -e "\\e[41m   DOCTOR   \\e[0m"
 """
-
-    PS1_map = {
-        0: f'\\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[0m\\]$ ',
-        1: f'\\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[0m\\]\\[\\e[1;{termcolor_code(prompt_color)}m\\]$\\[\\e[0m\\] ',
-        2: f'\\[\\e[1;32m\\]Doctor@\\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[0m\\]> ',
-        3: f'\\[\\e[1;34m\\][Doctor \\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[1;34m\\]] #\\[\\e[0m\\] ',
-        4: f'\\[\\e[0m\\]$ '
-    }
-    prompt_cmd = PS1_map.get(prompt_style, PS1_map[0])
-
-    bashrc_content = f"""
+        # Prompt padrão simples para não conflitar com banner customizado
+        prompt_cmd = "\\[\\e[1;32m\\]lunatico\\[\\e[0m\\]$ "
+        bashrc_content = banner_command + f"\nexport PS1=\"{prompt_cmd}\"\n"
+    else:
+        banner_command = f"""
+figlet -f {banner_style} "{banner_name}" | GREP_COLORS='mt=01;{termcolor_code(banner_color)}' grep --color=always '.'
+"""
+        PS1_map = {
+            0: f'\\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[0m\\]$ ',
+            1: f'\\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[0m\\]\\[\\e[1;{termcolor_code(prompt_color)}m\\]$\\[\\e[0m\\] ',
+            2: f'\\[\\e[1;32m\\]Doctor@\\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[0m\\]> ',
+            3: f'\\[\\e[1;34m\\][Doctor \\[\\e[1;{termcolor_code(prompt_color)}m\\]{banner_name}\\[\\e[1;34m\\]] #\\[\\e[0m\\] ',
+            4: f'\\[\\e[0m\\]$ '
+        }
+        prompt_cmd = PS1_map.get(prompt_style, PS1_map[0])
+        bashrc_content = f"""
 # Doctor Personalização custom banner and prompt start
-
 clear
 {banner_command}
 export PS1="{prompt_cmd}"
-
 # Doctor Personalização custom banner and prompt end
 """
 
     try:
         with open(bashrc_path, "w", encoding="utf-8") as f:
             f.write(bashrc_content)
-        console.print(f"[green]Arquivo ~/.bashrc atualizado com sucesso para aplicar banner e prompt personalizados.[/green]")
+        console.print("[green]Arquivo ~/.bashrc atualizado para aplicar configurações.[/green]")
     except Exception as e:
         console.print(f"[red]Erro ao atualizar ~/.bashrc: {e}[/red]")
+
+def show_system_banner():
+    clear_screen()
+    banner_text = pyfiglet.figlet_format("Lunático", font="3-d")
+    banner_panel = Panel(Text(banner_text, style="magenta"), box=ASCII_DOUBLE_HEAD, border_style="magenta", padding=(1,2))
+    front_panel = Panel(Text("Doctor", style="bold white on red"), border_style="red", padding=(0,2))
+    console.print(front_panel, justify="right")
+    console.print(banner_panel)
+    console.print("\nPressione Enter para voltar ao menu...")
+    input()
 
 def painel():
     cfg = load_config()
@@ -172,7 +195,8 @@ Pressione Enter para continuar...
                 f"- Cor do banner: [yellow]{cfg['banner_color'].capitalize()}[/yellow]\n"
                 f"- Estilo do prompt: [yellow]{STYLES[cfg['style']]}[/yellow]\n"
                 f"- Cor do prompt: [yellow]{cfg['color'].capitalize()}[/yellow]\n"
-                f"- Senha ativada: [yellow]{'Sim' if cfg['password_enabled'] else 'Não'}[/yellow]"
+                f"- Senha ativada: [yellow]{'Sim' if cfg['password_enabled'] else 'Não'}[/yellow]\n"
+                f"- Banner do sistema ativo: [yellow]{'Sim' if cfg.get('system_banner_enabled') else 'Não'}[/yellow]"
             )
         else:
             config_status = "[bold white]Nenhuma configuração salva ainda.[/bold white]"
@@ -190,6 +214,7 @@ Pressione Enter para continuar...
 7. Visualizar painel
 8. Voltar para configurações padrão
 9. Sair e salvar
+10. Atualizar banner do sistema (Lunático 3D + Doctor front)
 """
         console.print(Panel(Align.center(painel_text.strip(), vertical="middle"),
                             title="Doctor Personalização", border_style="green", padding=(1,2),
@@ -197,12 +222,11 @@ Pressione Enter para continuar...
         show_credits_panel()
 
         try:
-            escolha = IntPrompt.ask("Escolha uma opção", choices=[str(i) for i in range(1,10)])
+            escolha = IntPrompt.ask("Escolha uma opção", choices=[str(i) for i in range(1,11)])
         except KeyboardInterrupt:
             console.print("\nSaindo sem salvar...")
             break
 
-        # Sempre mostrar a barra de loading após cada escolha válida (antes de aplicar)
         def show_loading(msg):
             loading(f"{msg}...", 2)
 
@@ -234,6 +258,16 @@ Pressione Enter para continuar...
             generate_bashrc(cfg)
             console.print("\n[green]Configurações salvas e shell personalizado aplicado! Saindo...[/green]")
             break
+        elif escolha == 10:
+            # Marca como ativo e pede confirmação
+            if Confirm.ask("Deseja ativar o banner do sistema com Lunático e Doctor front?"):
+                cfg["system_banner_enabled"] = True
+                save_config(cfg)
+                loading("Atualizando banner do sistema ativo", 2)
+                show_system_banner()
+            else:
+                console.print("[yellow]Opção cancelada.[/yellow]")
+                time.sleep(1)
 
 def input_name(cfg):
     while True:
@@ -353,7 +387,8 @@ def reset_config(cfg):
             "style": 0,
             "color": "green",
             "password_enabled": False,
-            "password": ""
+            "password": "",
+            "system_banner_enabled": False
         })
         save_config(cfg)
         generate_bashrc(cfg)
@@ -411,3 +446,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
