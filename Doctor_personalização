@@ -5,28 +5,24 @@
 Doctor Personalização - Painel de customização do Termux
 Criado por Doctor - 2025
 
-Painel interativo no terminal usando Rich com:
-- Nome/banner personalizado
-- Escolha de estilo do prompt
-- Escolha de cor
-- Ativar/Desativar senha
-- Salvar configurações automaticamente
-- Barra de carregamento em cada etapa
-- Créditos do criador na tela
+Painel moderno com escolha avançada de banner ASCII colorido.
 """
 
 import os
 import json
 import time
+import pyfiglet
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.align import Align
+from rich.text import Text
 
 console = Console()
 CONFIG_PATH = os.path.expanduser("~/.doctor_personalizacao_config.json")
 
-# Estilos do prompt disponíveis
+# Estilos do prompt para terminal
 STYLES = [
     "Simples: nome$",
     "Colorido: nome com cor e $",
@@ -35,7 +31,7 @@ STYLES = [
     "Sem estilo: Apenas $"
 ]
 
-# Cores disponíveis (Rich reconhece esses nomes)
+# Cores disponíveis (rich)
 COLORS = [
     "red",
     "green",
@@ -46,6 +42,15 @@ COLORS = [
     "white"
 ]
 
+# Estilos pyfiglet para banners ASCII art
+BANNER_STYLES = [
+    "standard",
+    "3-d",
+    "banner3-D",
+    "starwars",
+    "slant"
+]
+
 def clear_screen():
     os.system('clear' if os.name == 'posix' else 'cls')
 
@@ -53,13 +58,13 @@ def load_config():
     if os.path.isfile(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-                return cfg
+                return json.load(f)
         except Exception:
             pass
-    # Defaults
     return {
         "name": "Doctor",
+        "banner_style": 0,
+        "banner_color": "green",
         "style": 0,
         "color": "green",
         "password_enabled": False,
@@ -79,102 +84,48 @@ def loading(message: str, duration=3):
         console=console
     ) as progress:
         task = progress.add_task(message, total=100)
-        for i in range(100):
+        for _ in range(100):
             progress.update(task, advance=1)
             time.sleep(duration/100)
 
-def input_name(cfg):
-    clear_screen()
-    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Digite seu nome para o banner personalizado:[/italic]\n", title="Banner / Nome"))
-    name = Prompt.ask("Nome", default=cfg.get("name", "Doctor"))
-    loading("Aplicando nome banner...", 2)
-    cfg["name"] = name
-
-def input_style(cfg):
-    clear_screen()
-    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha o estilo do prompt:[/italic]", title="Estilo do Prompt"))
-    for i, st in enumerate(STYLES):
-        highlight = "yellow" if i == cfg.get("style",0) else None
-        console.print(f"[{'bold ' + highlight if highlight else ''}]{i}[/]: {st}", highlight=highlight)
-    choice = IntPrompt.ask("Número do estilo", default=cfg.get("style",0), choices=[str(i) for i in range(len(STYLES))])
-    loading("Aplicando estilo do prompt...", 2)
-    cfg["style"] = int(choice)
-
-def input_color(cfg):
-    clear_screen()
-    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha a cor do prompt:[/italic]", title="Cor do Prompt"))
-    for i, color in enumerate(COLORS):
-        highlight = "yellow" if color == cfg.get("color", "green") else None
-        console.print(f"[{'bold ' + highlight if highlight else ''}]{i}[/]: [{color}]{color.capitalize()}[/]", highlight=highlight)
-    choice = IntPrompt.ask("Número da cor", default=COLORS.index(cfg.get("color","green")), choices=[str(i) for i in range(len(COLORS))])
-    loading("Aplicando cor do prompt...", 2)
-    cfg["color"] = COLORS[int(choice)]
-
-def input_password(cfg):
-    clear_screen()
-    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Ativar ou desativar senha para entrar no Termux?[/italic]", title="Senha de Proteção"))
-    enabled = Confirm.ask("Ativar senha?", default=cfg.get("password_enabled", False))
-    cfg["password_enabled"] = enabled
-    if enabled:
-        pwd1 = Prompt.ask("Digite a senha", password=True)
-        pwd2 = Prompt.ask("Confirme a senha", password=True)
-        if pwd1 == pwd2:
-            cfg["password"] = pwd1
-            loading("Senha configurada...", 2)
-        else:
-            console.print("[red]Senhas não conferem. Senha desativada.[/red]")
-            cfg["password_enabled"] = False
-            cfg["password"] = ""
-            loading("Cancelando configuração de senha...", 2)
-    else:
-        cfg["password"] = ""
-        loading("Senha removida...", 2)
-
-def reset_config(cfg):
-    clear_screen()
-    console.print(Panel("[bold red]Tem certeza que deseja limpar todas as configurações?[/bold red]\nIsto não pode ser desfeito!", title="Atenção"))
-    confirm = Confirm.ask("Limpar configurações e reverter para padrão?", default=False)
-    if confirm:
-        cfg.clear()
-        cfg.update({
-            "name": "Doctor",
-            "style": 0,
-            "color": "green",
-            "password_enabled": False,
-            "password": ""
-        })
-        save_config(cfg)
-        loading("Configurações limpas...", 2)
-        console.print("[green]Configurações resetadas para padrão.[/green]")
-        time.sleep(1)
-
-def show_credits():
-    console.print("\n[dim]Doctor Personalização - Criado por Doctor - 2025[/dim]")
+def show_credits_panel():
+    credit_text = "[dim]Doctor Personalização - Criado por Doctor - 2025[/dim]"
+    panel = Panel(credit_text, style="dim", padding=(0,1))
+    console.print(Align.center(panel))
 
 def painel():
     cfg = load_config()
     while True:
         clear_screen()
-        painel_text = f"""[bold green]Doctor Personalização[/bold green]
+        config_status = (
+            f"[bold white]Configurações atuais[/bold white]\n"
+            f"- Nome/banner: [yellow]{cfg['name']}[/yellow]\n"
+            f"- Estilo do banner ASCII: [yellow]{BANNER_STYLES[cfg['banner_style']]}[/yellow]\n"
+            f"- Cor do banner: [yellow]{cfg['banner_color'].capitalize()}[/yellow]\n"
+            f"- Estilo do prompt: [yellow]{STYLES[cfg['style']]}[/yellow]\n"
+            f"- Cor do prompt: [yellow]{cfg['color'].capitalize()}[/yellow]\n"
+            f"- Senha ativada: [yellow]{'Sim' if cfg['password_enabled'] else 'Não'}[/yellow]"
+        )
 
-[b]Configurações atuais:[/b]
-- Nome do banner: [yellow]{cfg['name']}[/yellow]
-- Estilo do prompt: [yellow]{STYLES[cfg['style']]}[/yellow]
-- Cor do prompt: [yellow]{cfg['color'].capitalize()}[/yellow]
-- Senha ativada: [yellow]{'Sim' if cfg['password_enabled'] else 'Não'}[/yellow]
+        painel_text = f"""
+{config_status}
 
-[bold]Menu:[/bold]
+[bold]Menu principal:[/bold]
 1. Alterar nome/banner
-2. Alterar estilo do prompt
-3. Alterar cor do prompt
-4. Ativar / Desativar senha
-5. Limpar configurações
-6. Sair e salvar
+2. Alterar estilo do banner ASCII
+3. Alterar cor do banner
+4. Alterar estilo do prompt
+5. Alterar cor do prompt
+6. Ativar / Desativar senha
+7. Visualizar painel
+8. Voltar para configurações padrão
+9. Sair e salvar
 """
-        console.print(Panel(painel_text, title="Doctor Personalização", padding=(1, 2), subtitle="[bold cyan]Doctor - 2025[/bold cyan]"))
+        console.print(Panel(Align.center(painel_text.strip(), vertical="middle"), title="Doctor Personalização", border_style="green", padding=(1,2), subtitle="[bold cyan]Doctor - 2025[/bold cyan]"))
+        show_credits_panel()
 
         try:
-            escolha = IntPrompt.ask("Escolha uma opção", choices=[str(i) for i in range(1,7)])
+            escolha = IntPrompt.ask("Escolha uma opção", choices=[str(i) for i in range(1,10)])
         except KeyboardInterrupt:
             console.print("\nSaindo sem salvar...")
             break
@@ -182,20 +133,189 @@ def painel():
         if escolha == 1:
             input_name(cfg)
         elif escolha == 2:
-            input_style(cfg)
+            input_banner_style(cfg)
         elif escolha == 3:
-            input_color(cfg)
+            input_banner_color(cfg)
         elif escolha == 4:
-            input_password(cfg)
+            input_style(cfg)
         elif escolha == 5:
-            reset_config(cfg)
+            input_color(cfg)
         elif escolha == 6:
+            input_password(cfg)
+        elif escolha == 7:
+            show_panel_mockup(cfg)
+        elif escolha == 8:
+            reset_config(cfg)
+        elif escolha == 9:
             save_config(cfg)
             console.print("\n[green]Configurações salvas! Saindo...[/green]")
             break
 
+def input_name(cfg):
+    while True:
+        clear_screen()
+        title = "Banner / Nome"
+        prompt_text = "[italic]Digite seu nome para o banner personalizado:[/italic]"
+        console.print(Panel(Align.center(f"[bold green]Doctor Personalização[/bold green]\n\n{prompt_text}", vertical="middle"), title=title, border_style="blue", padding=(1,2)))
+        show_credits_panel()
+        name = Prompt.ask("Nome", default=cfg.get("name", "Doctor"))
+        if not name.replace(" ","").isalpha():
+            console.print("[red]Digite apenas letras e espaços.[/red]")
+            time.sleep(2)
+            continue
+        loading("Aplicando nome banner...", 2)
+        cfg["name"] = name
+        if not Confirm.ask("Deseja alterar o nome novamente?", default=False):
+            break
+
+def input_banner_style(cfg):
+    while True:
+        clear_screen()
+        title = "Estilo do Banner ASCII"
+        console.print(Panel(Align.center("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha o estilo do banner ASCII:[/italic]", vertical="middle"), title=title, border_style="blue", padding=(1,2)))
+        show_credits_panel()
+        for style_name in BANNER_STYLES:
+            console.print(f"  [cyan]{style_name}[/cyan]")
+        choice = IntPrompt.ask(f"Digite o número da opção desejada (0 a {len(BANNER_STYLES)-1})", choices=[str(i) for i in range(len(BANNER_STYLES))])
+        loading("Aplicando estilo do banner ASCII...", 2)
+        cfg["banner_style"] = int(choice)
+        if not Confirm.ask("Deseja alterar o estilo do banner novamente?", default=False):
+            break
+
+def input_banner_color(cfg):
+    while True:
+        clear_screen()
+        title = "Cor do Banner"
+        console.print(Panel(Align.center("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha a cor do banner:[/italic]", vertical="middle"), title=title, border_style="blue", padding=(1,2)))
+        show_credits_panel()
+        for color_text in COLORS:
+            console.print(f"  [{color_text}]{color_text.capitalize()}[/]")
+        choice = IntPrompt.ask(f"Digite o número da opção desejada (0 a {len(COLORS)-1})", choices=[str(i) for i in range(len(COLORS))])
+        loading("Aplicando cor do banner...", 2)
+        cfg["banner_color"] = COLORS[int(choice)]
+        if not Confirm.ask("Deseja alterar a cor do banner novamente?", default=False):
+            break
+
+def input_style(cfg):
+    while True:
+        clear_screen()
+        title = "Estilo do Prompt"
+        console.print(Panel(Align.center("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha o estilo do prompt:[/italic]", vertical="middle"), title=title, border_style="blue", padding=(1,2)))
+        show_credits_panel()
+        for style_text in STYLES:
+            console.print(f"  [cyan]{style_text}[/cyan]")
+        choice = IntPrompt.ask(f"Digite o número da opção desejada (0 a {len(STYLES)-1})", choices=[str(i) for i in range(len(STYLES))])
+        loading("Aplicando estilo do prompt...", 2)
+        cfg["style"] = int(choice)
+        if not Confirm.ask("Deseja alterar o estilo do prompt novamente?", default=False):
+            break
+
+def input_color(cfg):
+    while True:
+        clear_screen()
+        title = "Cor do Prompt"
+        console.print(Panel(Align.center("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha a cor do prompt:[/italic]", vertical="middle"), title=title, border_style="blue", padding=(1,2)))
+        show_credits_panel()
+        for color_text in COLORS:
+            console.print(f"  [{color_text}]{color_text.capitalize()}[/]")
+        choice = IntPrompt.ask(f"Digite o número da opção desejada (0 a {len(COLORS)-1})", choices=[str(i) for i in range(len(COLORS))])
+        loading("Aplicando cor do prompt...", 2)
+        cfg["color"] = COLORS[int(choice)]
+        if not Confirm.ask("Deseja alterar a cor do prompt novamente?", default=False):
+            break
+
+def input_password(cfg):
+    while True:
+        clear_screen()
+        title = "Senha de Proteção"
+        console.print(Panel(Align.center("[bold green]Doctor Personalização[/bold green]\n\n[italic]Ativar ou desativar senha para proteger o Termux?[/italic]", vertical="middle"), title=title, border_style="blue", padding=(1,2)))
+        show_credits_panel()
+        enabled = Confirm.ask("Ativar senha?", default=cfg.get("password_enabled", False))
+        cfg["password_enabled"] = enabled
+        if enabled:
+            pwd1 = Prompt.ask("Digite a senha", password=True)
+            pwd2 = Prompt.ask("Confirme a senha", password=True)
+            if pwd1 == pwd2:
+                loading("Senha configurada...", 2)
+                cfg["password"] = pwd1
+            else:
+                console.print("[red]Senhas não conferem. A senha foi desativada.[/red]")
+                cfg["password_enabled"] = False
+                cfg["password"] = ""
+                loading("Cancelando configuração de senha...", 2)
+        else:
+            cfg["password"] = ""
+            loading("Senha removida...", 2)
+        if not Confirm.ask("Deseja alterar a senha novamente?", default=False):
+            break
+
+def reset_config(cfg):
+    clear_screen()
+    console.print(Panel("[bold red]Tem certeza que deseja voltar para configurações padrão?[/bold red]\nIsto removerá todas as personalizações!", title="Atenção", border_style="red", padding=(1,2)))
+    show_credits_panel()
+    confirm = Confirm.ask("Confirmar reset?", default=False)
+    if confirm:
+        cfg.clear()
+        cfg.update({
+            "name": "Doctor",
+            "banner_style": 0,
+            "banner_color": "green",
+            "style": 0,
+            "color": "green",
+            "password_enabled": False,
+            "password": ""
+        })
+        save_config(cfg)
+        loading("Configurações resetadas para padrão...", 3)
+        console.print("[green]Configurações restauradas ao padrão do Termux.[/green]")
+        time.sleep(2)
+
+def show_panel_mockup(cfg):
+    clear_screen()
+    title = "Visualização do Painel"
+    show_credits_panel()
+    banner_text = pyfiglet.figlet_format(cfg["name"], font=BANNER_STYLES[cfg["banner_style"]])
+    banner_colored = Text(banner_text, style=cfg["banner_color"])
+    prompt_example = generate_prompt_preview(cfg)
+    console.print(Panel(banner_colored, title="Banner:", border_style=cfg["banner_color"]))
+    console.print(Panel(prompt_example, title="Exemplo do Prompt", border_style=cfg["color"]))
+    console.print("\nPressione Enter para voltar ao menu...")
+    input()
+
+def generate_prompt_preview(cfg):
+    """Gera um preview colorido do prompt conforme as configurações"""
+    from rich.style import Style
+    from rich.text import Text
+
+    style_idx = cfg.get("style",0)
+    name = cfg.get("name", "Doctor")
+    color = cfg.get("color", "green")
+
+    name_styled = Text(name, style=Style(color=color,bold=True))
+    prompt = Text()
+
+    if style_idx == 0:
+        prompt.append(name_styled)
+        prompt.append("$ ")
+    elif style_idx == 1:
+        prompt.append(name_styled)
+        prompt.append(Text("$ ", style=Style(color=color,bold=True)))
+    elif style_idx == 2:
+        prompt.append(Text("Doctor@", style=Style(color="green",bold=True)))
+        prompt.append(name_styled)
+        prompt.append("> ")
+    elif style_idx == 3:
+        prompt.append(Text("[Doctor ", style=Style(color="blue",bold=True)))
+        prompt.append(name_styled)
+        prompt.append(Text("] # ", style=Style(color="blue",bold=True)))
+    elif style_idx == 4:
+        prompt.append(Text("$ ", style=Style(color="white")))
+    else:
+        prompt.append(Text("$ ", style=Style(color="white")))
+
+    return prompt
+
 def main():
-    # Ao iniciar o painel, ele entra direto
     clear_screen()
     painel()
 
