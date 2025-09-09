@@ -1,0 +1,163 @@
+import os
+import json
+import time
+from rich.console import Console
+from rich.progress import Progress
+from rich.panel import Panel
+
+# --- Configurações ---
+CONFIG_FILE = "painel_config.json"
+console = Console()
+
+# --- Função para limpar a tela ---
+def limpar_tela():
+    os.system("clear")
+
+# --- Funções de persistência ---
+def carregar_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    else:
+        return {
+            "banner": "",
+            "banner_cor": "white",
+            "front": "",
+            "front_cor": "white",
+            "senha": None
+        }
+
+def salvar_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f)
+
+# --- Função de barra de carregamento ---
+def barra_carregamento(mensagem, duracao=1.5):
+    console.print(f"\n[bold cyan]{mensagem}[/bold cyan]")
+    with Progress() as progress:
+        task = progress.add_task("", total=100)
+        for i in range(100):
+            time.sleep(duracao/100)
+            progress.update(task, advance=1)
+    console.print("[bold green]Concluído![/bold green]\n")
+    time.sleep(0.3)
+
+# --- Função para escolher estilo ---
+def escolher_estilo(tipo):
+    estilos = [f"{tipo} {i}" for i in range(1, 16)]
+    while True:
+        limpar_tela()
+        console.print(f"[bold]Escolha o estilo do {tipo}:[/bold]")
+        for i, est in enumerate(estilos, 1):
+            console.print(f"{i}. {est}")
+        escolha = input("\nDigite o número do estilo: ")
+        if escolha.isdigit() and 1 <= int(escolha) <= len(estilos):
+            barra_carregamento(f"Aguarde, estamos adicionando estilo do {tipo}...")
+            return estilos[int(escolha)-1]
+
+# --- Função para escolher cor ---
+def escolher_cor(tipo):
+    cores = ["white","red","green","yellow","blue","magenta","cyan"]
+    while True:
+        limpar_tela()
+        console.print(f"[bold]Escolha a cor do {tipo}:[/bold]")
+        for i, cor in enumerate(cores, 1):
+            console.print(f"{i}. [{cor}]{cor}[/{cor}]")
+        escolha = input("\nDigite o número da cor: ")
+        if escolha.isdigit() and 1 <= int(escolha) <= len(cores):
+            barra_carregamento(f"Aguarde, estamos adicionando cor do {tipo}...")
+            return cores[int(escolha)-1]
+
+# --- Funções para banner e front ---
+def adicionar_banner(config):
+    config["banner"] = escolher_estilo("Banner")
+    config["banner_cor"] = escolher_cor("Banner")
+
+def adicionar_front(config):
+    config["front"] = escolher_estilo("Front")
+    config["front_cor"] = escolher_cor("Front")
+
+# --- Função para senha ---
+def gerenciar_senha(config):
+    limpar_tela()
+    if config["senha"]:
+        console.print("1. Remover senha\n2. Voltar")
+        escolha = input("\nDigite a opção: ")
+        if escolha == "1":
+            config["senha"] = None
+            barra_carregamento("Removendo senha...")
+    else:
+        senha = input("Digite uma nova senha: ")
+        if senha:
+            barra_carregamento("Adicionando senha...")
+            config["senha"] = senha
+
+# --- Função de personalização do dono ---
+def personalizacao_dono(config):
+    barra_carregamento("Aplicando personalização do dono...")
+    config["banner"] = "Lunático"
+    config["banner_cor"] = "green"
+    config["front"] = "Doctor"
+    config["front_cor"] = "white"
+    console.print("[bold green]Personalização do dono aplicada com sucesso![/bold green]")
+    time.sleep(1)
+
+# --- Função para visualizar painel ---
+def visualizar_painel(config):
+    limpar_tela()
+    painel_texto = f"""
+Banner: [bold {config['banner_cor']}]{config['banner']}[/{config['banner_cor']}]
+Front : [bold {config['front_cor']}]{config['front']}[/{config['front_cor']}]
+Senha : {'Ativa' if config['senha'] else 'Não definida'}
+"""
+    console.print(Panel(painel_texto, title="Visualização do Painel"))
+    input("\nPressione ENTER para voltar ao menu.")
+
+# --- Menu principal ---
+def menu_principal(config):
+    while True:
+        limpar_tela()
+        console.print(Panel("[bold cyan]Painel Personalizado - Doctor Coringa Lunático[/bold cyan]\n[Slogan Criativo Aqui]", style="magenta"))
+        console.print("1. Adicionar Banner")
+        console.print("2. Adicionar Front")
+        console.print("3. Adicionar/Remover Senha")
+        console.print("4. Personalização do dono")
+        console.print("5. Visualizar Painel")
+        console.print("6. Sair e Salvar\n")
+        console.print("[bold]Créditos:[/bold] Doctor Coringa Lunático")
+        console.print("[bold]Slogan:[/bold] Seu painel único e personalizável!\n")
+
+        escolha = input("Digite a opção: ")
+        if escolha == "1":
+            adicionar_banner(config)
+        elif escolha == "2":
+            adicionar_front(config)
+        elif escolha == "3":
+            gerenciar_senha(config)
+        elif escolha == "4":
+            personalizacao_dono(config)
+        elif escolha == "5":
+            visualizar_painel(config)
+        elif escolha == "6":
+            salvar_config(config)
+            console.print("[bold green]Configurações salvas! Saindo...[/bold green]")
+            break
+        else:
+            console.print("[bold red]Opção inválida![/bold red]")
+            input("Pressione ENTER para continuar.")
+
+# --- Programa principal ---
+config = carregar_config()
+
+# --- Senha ao abrir (se houver) ---
+if config["senha"]:
+    limpar_tela()
+    for _ in range(3):
+        senha = input("Digite a senha para acessar: ")
+        if senha == config["senha"]:
+            break
+    else:
+        console.print("[bold red]Senha incorreta! Saindo...[/bold red]")
+        exit()
+
+menu_principal(config)
