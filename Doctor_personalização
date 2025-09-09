@@ -1,163 +1,203 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Doctor Personalização - Painel de customização do Termux
+Criado por Doctor - 2025
+
+Painel interativo no terminal usando Rich com:
+- Nome/banner personalizado
+- Escolha de estilo do prompt
+- Escolha de cor
+- Ativar/Desativar senha
+- Salvar configurações automaticamente
+- Barra de carregamento em cada etapa
+- Créditos do criador na tela
+"""
+
 import os
 import json
 import time
 from rich.console import Console
-from rich.progress import Progress
 from rich.panel import Panel
+from rich.prompt import Prompt, IntPrompt, Confirm
+from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 
-# --- Configurações ---
-CONFIG_FILE = "painel_config.json"
 console = Console()
+CONFIG_PATH = os.path.expanduser("~/.doctor_personalizacao_config.json")
 
-# --- Função para limpar a tela ---
-def limpar_tela():
-    os.system("clear")
+# Estilos do prompt disponíveis
+STYLES = [
+    "Simples: nome$",
+    "Colorido: nome com cor e $",
+    "Estilo médico: Doctor@nome>",
+    "Estilo avançado: [Doctor nome] #",
+    "Sem estilo: Apenas $"
+]
 
-# --- Funções de persistência ---
-def carregar_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    else:
-        return {
-            "banner": "",
-            "banner_cor": "white",
-            "front": "",
-            "front_cor": "white",
-            "senha": None
-        }
+# Cores disponíveis (Rich reconhece esses nomes)
+COLORS = [
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "white"
+]
 
-def salvar_config(config):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f)
+def clear_screen():
+    os.system('clear' if os.name == 'posix' else 'cls')
 
-# --- Função de barra de carregamento ---
-def barra_carregamento(mensagem, duracao=1.5):
-    console.print(f"\n[bold cyan]{mensagem}[/bold cyan]")
-    with Progress() as progress:
-        task = progress.add_task("", total=100)
+def load_config():
+    if os.path.isfile(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                return cfg
+        except Exception:
+            pass
+    # Defaults
+    return {
+        "name": "Doctor",
+        "style": 0,
+        "color": "green",
+        "password_enabled": False,
+        "password": ""
+    }
+
+def save_config(cfg):
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=4)
+
+def loading(message: str, duration=3):
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TimeElapsedColumn(),
+        transient=True,
+        console=console
+    ) as progress:
+        task = progress.add_task(message, total=100)
         for i in range(100):
-            time.sleep(duracao/100)
             progress.update(task, advance=1)
-    console.print("[bold green]Concluído![/bold green]\n")
-    time.sleep(0.3)
+            time.sleep(duration/100)
 
-# --- Função para escolher estilo ---
-def escolher_estilo(tipo):
-    estilos = [f"{tipo} {i}" for i in range(1, 16)]
-    while True:
-        limpar_tela()
-        console.print(f"[bold]Escolha o estilo do {tipo}:[/bold]")
-        for i, est in enumerate(estilos, 1):
-            console.print(f"{i}. {est}")
-        escolha = input("\nDigite o número do estilo: ")
-        if escolha.isdigit() and 1 <= int(escolha) <= len(estilos):
-            barra_carregamento(f"Aguarde, estamos adicionando estilo do {tipo}...")
-            return estilos[int(escolha)-1]
+def input_name(cfg):
+    clear_screen()
+    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Digite seu nome para o banner personalizado:[/italic]\n", title="Banner / Nome"))
+    name = Prompt.ask("Nome", default=cfg.get("name", "Doctor"))
+    loading("Aplicando nome banner...", 2)
+    cfg["name"] = name
 
-# --- Função para escolher cor ---
-def escolher_cor(tipo):
-    cores = ["white","red","green","yellow","blue","magenta","cyan"]
-    while True:
-        limpar_tela()
-        console.print(f"[bold]Escolha a cor do {tipo}:[/bold]")
-        for i, cor in enumerate(cores, 1):
-            console.print(f"{i}. [{cor}]{cor}[/{cor}]")
-        escolha = input("\nDigite o número da cor: ")
-        if escolha.isdigit() and 1 <= int(escolha) <= len(cores):
-            barra_carregamento(f"Aguarde, estamos adicionando cor do {tipo}...")
-            return cores[int(escolha)-1]
+def input_style(cfg):
+    clear_screen()
+    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha o estilo do prompt:[/italic]", title="Estilo do Prompt"))
+    for i, st in enumerate(STYLES):
+        highlight = "yellow" if i == cfg.get("style",0) else None
+        console.print(f"[{'bold ' + highlight if highlight else ''}]{i}[/]: {st}", highlight=highlight)
+    choice = IntPrompt.ask("Número do estilo", default=cfg.get("style",0), choices=[str(i) for i in range(len(STYLES))])
+    loading("Aplicando estilo do prompt...", 2)
+    cfg["style"] = int(choice)
 
-# --- Funções para banner e front ---
-def adicionar_banner(config):
-    config["banner"] = escolher_estilo("Banner")
-    config["banner_cor"] = escolher_cor("Banner")
+def input_color(cfg):
+    clear_screen()
+    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Escolha a cor do prompt:[/italic]", title="Cor do Prompt"))
+    for i, color in enumerate(COLORS):
+        highlight = "yellow" if color == cfg.get("color", "green") else None
+        console.print(f"[{'bold ' + highlight if highlight else ''}]{i}[/]: [{color}]{color.capitalize()}[/]", highlight=highlight)
+    choice = IntPrompt.ask("Número da cor", default=COLORS.index(cfg.get("color","green")), choices=[str(i) for i in range(len(COLORS))])
+    loading("Aplicando cor do prompt...", 2)
+    cfg["color"] = COLORS[int(choice)]
 
-def adicionar_front(config):
-    config["front"] = escolher_estilo("Front")
-    config["front_cor"] = escolher_cor("Front")
-
-# --- Função para senha ---
-def gerenciar_senha(config):
-    limpar_tela()
-    if config["senha"]:
-        console.print("1. Remover senha\n2. Voltar")
-        escolha = input("\nDigite a opção: ")
-        if escolha == "1":
-            config["senha"] = None
-            barra_carregamento("Removendo senha...")
-    else:
-        senha = input("Digite uma nova senha: ")
-        if senha:
-            barra_carregamento("Adicionando senha...")
-            config["senha"] = senha
-
-# --- Função de personalização do dono ---
-def personalizacao_dono(config):
-    barra_carregamento("Aplicando personalização do dono...")
-    config["banner"] = "Lunático"
-    config["banner_cor"] = "green"
-    config["front"] = "Doctor"
-    config["front_cor"] = "white"
-    console.print("[bold green]Personalização do dono aplicada com sucesso![/bold green]")
-    time.sleep(1)
-
-# --- Função para visualizar painel ---
-def visualizar_painel(config):
-    limpar_tela()
-    painel_texto = f"""
-Banner: [bold {config['banner_cor']}]{config['banner']}[/{config['banner_cor']}]
-Front : [bold {config['front_cor']}]{config['front']}[/{config['front_cor']}]
-Senha : {'Ativa' if config['senha'] else 'Não definida'}
-"""
-    console.print(Panel(painel_texto, title="Visualização do Painel"))
-    input("\nPressione ENTER para voltar ao menu.")
-
-# --- Menu principal ---
-def menu_principal(config):
-    while True:
-        limpar_tela()
-        console.print(Panel("[bold cyan]Painel Personalizado - Doctor Coringa Lunático[/bold cyan]\n[Slogan Criativo Aqui]", style="magenta"))
-        console.print("1. Adicionar Banner")
-        console.print("2. Adicionar Front")
-        console.print("3. Adicionar/Remover Senha")
-        console.print("4. Personalização do dono")
-        console.print("5. Visualizar Painel")
-        console.print("6. Sair e Salvar\n")
-        console.print("[bold]Créditos:[/bold] Doctor Coringa Lunático")
-        console.print("[bold]Slogan:[/bold] Seu painel único e personalizável!\n")
-
-        escolha = input("Digite a opção: ")
-        if escolha == "1":
-            adicionar_banner(config)
-        elif escolha == "2":
-            adicionar_front(config)
-        elif escolha == "3":
-            gerenciar_senha(config)
-        elif escolha == "4":
-            personalizacao_dono(config)
-        elif escolha == "5":
-            visualizar_painel(config)
-        elif escolha == "6":
-            salvar_config(config)
-            console.print("[bold green]Configurações salvas! Saindo...[/bold green]")
-            break
+def input_password(cfg):
+    clear_screen()
+    console.print(Panel("[bold green]Doctor Personalização[/bold green]\n\n[italic]Ativar ou desativar senha para entrar no Termux?[/italic]", title="Senha de Proteção"))
+    enabled = Confirm.ask("Ativar senha?", default=cfg.get("password_enabled", False))
+    cfg["password_enabled"] = enabled
+    if enabled:
+        pwd1 = Prompt.ask("Digite a senha", password=True)
+        pwd2 = Prompt.ask("Confirme a senha", password=True)
+        if pwd1 == pwd2:
+            cfg["password"] = pwd1
+            loading("Senha configurada...", 2)
         else:
-            console.print("[bold red]Opção inválida![/bold red]")
-            input("Pressione ENTER para continuar.")
-
-# --- Programa principal ---
-config = carregar_config()
-
-# --- Senha ao abrir (se houver) ---
-if config["senha"]:
-    limpar_tela()
-    for _ in range(3):
-        senha = input("Digite a senha para acessar: ")
-        if senha == config["senha"]:
-            break
+            console.print("[red]Senhas não conferem. Senha desativada.[/red]")
+            cfg["password_enabled"] = False
+            cfg["password"] = ""
+            loading("Cancelando configuração de senha...", 2)
     else:
-        console.print("[bold red]Senha incorreta! Saindo...[/bold red]")
-        exit()
+        cfg["password"] = ""
+        loading("Senha removida...", 2)
 
-menu_principal(config)
+def reset_config(cfg):
+    clear_screen()
+    console.print(Panel("[bold red]Tem certeza que deseja limpar todas as configurações?[/bold red]\nIsto não pode ser desfeito!", title="Atenção"))
+    confirm = Confirm.ask("Limpar configurações e reverter para padrão?", default=False)
+    if confirm:
+        cfg.clear()
+        cfg.update({
+            "name": "Doctor",
+            "style": 0,
+            "color": "green",
+            "password_enabled": False,
+            "password": ""
+        })
+        save_config(cfg)
+        loading("Configurações limpas...", 2)
+        console.print("[green]Configurações resetadas para padrão.[/green]")
+        time.sleep(1)
+
+def show_credits():
+    console.print("\n[dim]Doctor Personalização - Criado por Doctor - 2025[/dim]")
+
+def painel():
+    cfg = load_config()
+    while True:
+        clear_screen()
+        painel_text = f"""[bold green]Doctor Personalização[/bold green]
+
+[b]Configurações atuais:[/b]
+- Nome do banner: [yellow]{cfg['name']}[/yellow]
+- Estilo do prompt: [yellow]{STYLES[cfg['style']]}[/yellow]
+- Cor do prompt: [yellow]{cfg['color'].capitalize()}[/yellow]
+- Senha ativada: [yellow]{'Sim' if cfg['password_enabled'] else 'Não'}[/yellow]
+
+[bold]Menu:[/bold]
+1. Alterar nome/banner
+2. Alterar estilo do prompt
+3. Alterar cor do prompt
+4. Ativar / Desativar senha
+5. Limpar configurações
+6. Sair e salvar
+"""
+        console.print(Panel(painel_text, title="Doctor Personalização", padding=(1, 2), subtitle="[bold cyan]Doctor - 2025[/bold cyan]"))
+
+        try:
+            escolha = IntPrompt.ask("Escolha uma opção", choices=[str(i) for i in range(1,7)])
+        except KeyboardInterrupt:
+            console.print("\nSaindo sem salvar...")
+            break
+
+        if escolha == 1:
+            input_name(cfg)
+        elif escolha == 2:
+            input_style(cfg)
+        elif escolha == 3:
+            input_color(cfg)
+        elif escolha == 4:
+            input_password(cfg)
+        elif escolha == 5:
+            reset_config(cfg)
+        elif escolha == 6:
+            save_config(cfg)
+            console.print("\n[green]Configurações salvas! Saindo...[/green]")
+            break
+
+def main():
+    # Ao iniciar o painel, ele entra direto
+    clear_screen()
+    painel()
+
+if __name__ == "__main__":
+    main()
